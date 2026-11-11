@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Time Bite · Prueba de afiches</title>
+<!-- Las rutas de assets/ y js/ son relativas a la raíz del sitio, como en index.html. -->
+<base href="../">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Lilita+One&family=Montserrat:wght@400;500;600;700;800;900&display=swap">
+<style>
+  html, body { margin: 0; background: #222; color: #eee; font: 14px/1.4 Montserrat, sans-serif; }
+  canvas { display: block; }
+  pre { margin: 16px; white-space: pre-wrap; }
+</style>
+<script src="js/data.js" defer></script>
+<script src="js/content.js" defer></script>
+</head>
+<body>
+<!--
+  Un afiche a tamaño real:  tests/flyers.html?t=producto&f=story&p=mar-fresa&v=0&o=Solo%20hoy&s=1
+  Tiempos y textos de todo:  tests/flyers.html?bench=1   (leer con chrome --headless --dump-dom)
+-->
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const q = new URLSearchParams(location.search), C = TB.content;
+  if (!q.has('bench')) {
+    const c = document.createElement('canvas');
+    document.body.appendChild(c);
+    const t0 = performance.now();
+    try {
+      const r = await C.render(c, { template: q.get('t') || 'producto', format: q.get('f') || 'story', product: q.get('p'), variant: +q.get('v') || 0, offer: q.get('o') || '', scale: +q.get('s') || 1 });
+      document.title = 'ok ' + Math.round(performance.now() - t0) + ' ms · ' + r.title;
+    } catch (e) { document.title = 'error ' + e.message; console.error(e); }
+    return;
+  }
+  // Banco: cada combinación dos veces (en frío con carga de imágenes y en caliente), más los textos.
+  const out = [], c = document.createElement('canvas');
+  await C.ready();
+  for (const t of C.TEMPLATES) {
+    for (const p of C.products(t.key)) {
+      for (const f of Object.keys(C.FORMATS)) {
+        for (let v = 0; v < C.variants(t.key); v++) {
+          const o = { template: t.key, format: f, product: p.key, variant: v };
+          // getImageData obliga a rasterizar: sin eso solo se mide la grabación de las órdenes de dibujo
+          const run = async () => { const t0 = performance.now(); await C.render(c, o); c.getContext('2d').getImageData(0, 0, 1, 1); return performance.now() - t0; };
+          const cold = await run(), warm = await run();
+          out.push(`${t.key}\t${p.key}\t${f}\tv${v}\t${cold.toFixed(0)} ms\t${warm.toFixed(0)} ms`);
+        }
+      }
+    }
+  }
+  const warm = out.map(l => +l.split('\t')[5].split(' ')[0]);
+  out.push('', 'renders: ' + warm.length + ' · en caliente: media ' + (warm.reduce((a, b) => a + b, 0) / warm.length).toFixed(0) + ' ms · máx. ' + Math.max(...warm) + ' ms');
+  await C.render(c, { template: 'producto', format: 'story', product: 'mar-fresa', variant: 0 });
+  let t0 = performance.now(); await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
+  out.push('toBlob JPEG historia: ' + (performance.now() - t0).toFixed(0) + ' ms', '');
+  for (const t of C.TEMPLATES) {
+    const p = C.products(t.key)[0];
+    for (const net of ['whatsapp', 'instagram', 'facebook']) {
+      for (let v = 0; v < C.variants(t.key); v++) {
+        const r = C.caption({ template: t.key, product: p.key, variant: v, network: net, offer: v === 2 ? 'Solo este fin de semana' : '' });
+        out.push(`--- ${t.key} · ${p.key} · ${net} · v${v} · ${r.bestTime} (${r.bestTimeLabel})`, r.text, r.hashtags.join(' '));
+      }
+    }
+  }
+  const pre = document.createElement('pre'); pre.id = 'bench'; pre.textContent = out.join('\n');
+  document.body.appendChild(pre);
+  document.title = 'bench listo';
+  // Para leerlo sin tiempo virtual (que congela performance.now): chrome --headless=new --enable-logging=stderr ... | grep BENCH
+  out.join('\n').split('\n').forEach(l => console.log('BENCH ' + l));
+});
+</script>
+</body>
+</html>

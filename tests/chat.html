@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Prueba · Pedidos y chat</title>
+<!-- Prueba aislada de js/chat.js + css/chat.css con un shell mínimo simulado (TB.app) y, si no existe js/bot.js, un bot simulado.
+     Parámetros: ?fresh (estado limpio) &tab=pedidos &day=ayer &play=demo|texto1|texto2 (&stop=N &after=pedidos) &sheet (abre el primer pedido) &off (bot apagado)
+     &stubbot (fuerza el bot simulado) &now=2026-11-11T13:30 -->
+<base href="../">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Montserrat:wght@400;500;600;700;800;900&display=swap">
+<style>
+  /* Sustituto mínimo de css/app.css (tokens y componentes compartidos) solo para esta prueba. */
+  :root { --tb-verde:#3D7534; --tb-verde-700:#2C5A26; --tb-verde-900:#1C3A18; --tb-verde-50:#EAF2E6; --tb-mostaza:#E8A122; --tb-mostaza-50:#FDF1D8; --tb-crema:#FFF5EC; --tb-crema-2:#F3E6CC; --tb-marron:#42220B; --tb-tinta:#1F2A1D; --tb-tinta-2:#5B6656; --tb-borde:#E5DAC3; --tb-rojo:#C2412D; --tb-azul:#2E5C8A; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--tb-crema); color: var(--tb-tinta); font: 15px/1.45 Montserrat, system-ui, sans-serif; overflow-x: hidden; }
+  button { font: inherit; }
+  .t-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; height: 60px; padding: 0 16px; background: var(--tb-crema); border-bottom: 1px solid var(--tb-borde); }
+  .t-top img { width: 36px; height: 36px; border-radius: 10px; }
+  .t-top b { font: 22px 'Lilita One', sans-serif; color: var(--tb-verde-900); }
+  .t-top span { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--tb-verde); background: var(--tb-verde-50); padding: 4px 10px; border-radius: 99px; }
+  .t-main { padding: 16px 16px calc(84px + env(safe-area-inset-bottom)); max-width: 480px; margin: 0 auto; }
+  .t-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: grid; grid-template-columns: repeat(5, 1fr); height: calc(66px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: #fff; border-top: 1px solid var(--tb-borde); max-width: 480px; margin: 0 auto; }
+  .t-nav span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--tb-tinta-2); }
+  .t-nav span.on { color: var(--tb-verde); }
+  .seg { display: flex; padding: 4px; gap: 4px; background: var(--tb-crema-2); border-radius: 12px; }
+  .seg button { flex: 1; min-height: 40px; border: 0; border-radius: 9px; background: none; color: var(--tb-tinta-2); font-weight: 700; font-size: 14px; padding: 0 14px; }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--tb-verde-900); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .chip { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 1px solid var(--tb-borde); border-radius: 99px; background: #fff; color: var(--tb-tinta); font-weight: 600; font-size: 13.5px; }
+  .chip-on { background: var(--tb-verde); border-color: var(--tb-verde); color: #fff; }
+  .card { background: #fff; border: 1px solid var(--tb-borde); border-radius: 14px; box-shadow: 0 1px 2px rgba(31,42,29,.05); }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .badge-verde { background: var(--tb-verde-50); color: var(--tb-verde-700); }
+  .badge-mostaza { background: var(--tb-mostaza-50); color: #8A5A0C; }
+  .badge-rojo { background: #FBE6E2; color: var(--tb-rojo); }
+  .badge-gris { background: #EEF0EC; color: var(--tb-tinta-2); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid transparent; font-weight: 700; }
+  .btn-primary { background: var(--tb-verde); color: #fff; }
+  .btn-ghost { background: #fff; border-color: var(--tb-borde); color: var(--tb-tinta); }
+  .btn-sm { min-height: 44px; font-size: 14px; }
+  .btn-block { width: 100%; }
+  .muted { color: var(--tb-tinta-2); }
+  .empty { padding: 28px 16px; background: #fff; border: 1px dashed var(--tb-borde); border-radius: 14px; }
+  .empty p { margin: 6px 0; }
+  .tile { display: grid; place-items: center; border-radius: 8px; }
+  .tile img { width: 60%; height: 60%; object-fit: contain; }
+  .t-sheet-bg { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; background: rgba(20,28,18,.45); }
+  .t-sheet { width: 100%; max-width: 480px; max-height: 88vh; overflow: auto; background: #fff; border-radius: 20px 20px 0 0; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .t-sheet-h { display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
+  .t-sheet-h b { font: 22px 'Lilita One', sans-serif; color: var(--tb-verde-900); }
+  .t-sheet-h button { width: 44px; height: 44px; border: 0; background: none; font-size: 26px; }
+  .t-sheet-a { display: grid; gap: 8px; margin-top: 16px; }
+  .t-toast { position: fixed; left: 16px; right: 16px; bottom: 82px; z-index: 60; display: flex; align-items: center; gap: 10px; max-width: 448px; margin: 0 auto; padding: 12px 14px; border-radius: 12px; background: var(--tb-tinta); color: #fff; font-weight: 600; font-size: 14px; }
+  .t-toast button { margin-left: auto; border: 0; background: none; color: var(--tb-mostaza); font-weight: 800; }
+</style>
+<link rel="stylesheet" href="css/chat.css">
+</head>
+<body>
+<header class="t-top"><img src="assets/img/logo-verde.webp" alt=""><b>Pedidos</b><span>Abierto</span></header>
+<main class="t-main"><section id="view"></section></main>
+<nav class="t-nav"><span>Inicio</span><span class="on">Pedidos</span><span>Contenido</span><span>Clientes</span><span>Ajustes</span></nav>
+
+<script src="js/data.js"></script>
+<script>
+  /* TB.app simulado: solo lo que usa chat.js, según el contrato de SPEC.md. */
+  (function () {
+    var qs = new URLSearchParams(location.search);
+    var offset = qs.get('now') ? new Date(qs.get('now')) - Date.now() : 0;
+    var KEY = 'tb-chat-test', ev = {};
+    var state = {};
+    try { if (!qs.has('fresh')) state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+    if (qs.has('off')) state.settings = { bot: { activo: false } };
+    state.orders = state.orders || []; state.patches = state.patches || {};
+    var IC = {
+      chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+      more: '<circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/>',
+      send: '<path d="M21 3L10 14M21 3l-6.5 18-4-7.5L3 9.5z"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+      truck: '<path d="M2.5 6.5h11v9.5h-11zM13.5 9.5h4l3 3.2V16h-7"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+      store: '<path d="M4 9l1.5-5h13L20 9M4 9h16v1.5a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 10.5zM5.5 13v7h13v-7"/>',
+      clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', bag: '<path d="M5 8h14l-1 12.5H6zM9 8V6.5a3 3 0 0 1 6 0V8"/>',
+      user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4.5M9 14h.01M15 14h.01"/>',
+      whatsapp: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>', instagram: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/>',
+      refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>', alert: '<path d="M12 3.5l9.5 16.5h-19zM12 10v4M12 17h.01"/>'
+    };
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function now() { return new Date(Date.now() + offset); }
+    var DIAS = ['dom.', 'lun.', 'mar.', 'mié.', 'jue.', 'vie.', 'sáb.'], MESES = ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'set.', 'oct.', 'nov.', 'dic.'];
+    function productImg(p) { return p.thumb ? { src: p.thumb, kind: 'thumb' } : p.heroSm ? { src: p.heroSm, kind: 'hero' } : { src: null, kind: null }; }
+    var NAMES = ['Rosa Panduro', 'Luis Pinedo', 'Carmen Tuanama', 'Jorge Shapiama', 'Milagros Tapullima', 'Diego Del Águila', 'Lucía Sangama', 'Kevin Amasifuen', 'Sofía Cachique', 'Ana Ríos', 'Pedro Vásquez', 'Gina Rengifo'];
+    function sim(date) {
+      var d0 = new Date(date); d0.setHours(0, 0, 0, 0);
+      var seed = d0.getDate() * 37 + d0.getMonth() * 7 + 11, out = [];
+      var rand = function () { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+      var isToday = d0.toDateString() === now().toDateString();
+      var base = isToday ? 1031 : 1001;
+      var prods = ['emp-mixto', 'emp-pollo', 'emp-hawaiana', 'mar-aguaje', 'mar-fresa', 'mar-cheesecake-maracuya', 'mar-crocante-maracuya', 'refresco', 'gaseosa'];
+      for (var i = 0; i < 11; i++) {
+        var t = new Date(d0); t.setHours(10, 4 + i * 55 + Math.floor(rand() * 25));
+        if (isToday && t > now()) break;
+        var items = [], n = 1 + Math.floor(rand() * 3);
+        for (var k = 0; k < n; k++) { var p = TB.data.porKey[prods[Math.floor(rand() * prods.length)]]; items.push({ key: p.key, name: p.largo, qty: 1 + Math.floor(rand() * 4), price: p.precio }); }
+        var sub = items.reduce(function (s, x) { return s + x.qty * x.price; }, 0);
+        var mode = rand() < .7 ? 'delivery' : 'recojo', z = TB.data.delivery.zonas[Math.floor(rand() * 3)];
+        var age = (now() - t) / 60000;
+        var status = !isToday || age > 120 ? 'entregado' : age < 20 ? 'nuevo' : age < 50 ? 'preparando' : mode === 'delivery' ? 'en camino' : 'listo para recojo';
+        // Igual que sim.js: slot sin label; el delivery de después de las 3 p. m. sale al día siguiente.
+        var sd = new Date(t); if (mode === 'delivery' && t.getHours() >= 15) sd.setDate(sd.getDate() + 1);
+        var st = mode === 'delivery' ? '15:00' : pad(t.getHours()) + ':' + pad(Math.min(59, t.getMinutes() + 15));
+        out.push({ code: 'TB-' + (base + i), customer: { name: NAMES[(i * 5 + d0.getDate()) % NAMES.length], phone: '9' + (40 + i) + ' ••• ' + (100 + i * 37) },
+          items: items, subtotal: sub, mode: mode, zone: mode === 'delivery' ? z.nombre : null, deliveryCost: mode === 'delivery' ? z.costo : 0,
+          total: sub + (mode === 'delivery' ? z.costo : 0),
+          slot: { date: sd.getFullYear() + '-' + pad(sd.getMonth() + 1) + '-' + pad(sd.getDate()), time: st },
+          pay: ['Yape', 'Plin', 'Tarjeta'][Math.floor(rand() * 3)], channel: rand() < .8 ? 'Bot de WhatsApp' : rand() < .5 ? 'WhatsApp (Alberto)' : 'Instagram',
+          status: status, createdAt: t.toISOString(), simulated: true, note: i % 4 === 1 ? 'Sin cebolla, por favor.' : undefined });
+      }
+      return out;
+    }
+    function ordersFor(date) {
+      var day = new Date(date).toDateString();
+      return sim(date).concat(state.orders.filter(function (o) { return new Date(o.createdAt).toDateString() === day; }))
+        .map(function (o) { return Object.assign({}, o, state.patches[o.code] || {}); })
+        .sort(function (a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+    }
+    TB.views = TB.views || [];
+    TB.app = {
+      state: state,
+      save: function () { try { localStorage.setItem(KEY, JSON.stringify(TB.app.state)); } catch (e) {} },
+      on: function (e, fn) { (ev[e] = ev[e] || []).push(fn); },
+      emit: function (e, p) { (ev[e] || []).forEach(function (fn) { fn(p); }); },
+      go: function (key, params) { console.log('go', key, JSON.stringify(params || {})); var v = TB.views.filter(function (x) { return x.key === key; })[0]; if (v && v.show) v.show(params); },
+      toast: function (text, opt) {
+        var t = document.createElement('div'); t.className = 't-toast'; t.textContent = text;
+        if (opt && opt.action) { var b = document.createElement('button'); b.textContent = opt.action.label; b.onclick = function () { t.remove(); opt.action.fn(); }; t.appendChild(b); }
+        document.body.appendChild(t); setTimeout(function () { t.remove(); }, 4000);
+      },
+      sheet: function (o) {
+        var bg = document.createElement('div'); bg.className = 't-sheet-bg';
+        bg.innerHTML = '<div class="t-sheet" role="dialog" aria-modal="true"><div class="t-sheet-h"><b></b><button type="button" aria-label="Cerrar">×</button></div><div class="t-sheet-b"></div><div class="t-sheet-a"></div></div>';
+        bg.querySelector('b').textContent = o.title;
+        var body = bg.querySelector('.t-sheet-b'); if (typeof o.body === 'string') body.innerHTML = o.body; else body.appendChild(o.body);
+        (o.actions || []).forEach(function (a) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-block ' + (a.primary ? 'btn-primary' : 'btn-ghost'); b.textContent = a.label; b.onclick = a.fn; bg.querySelector('.t-sheet-a').appendChild(b); });
+        var close = function () { bg.remove(); };
+        bg.querySelector('.t-sheet-h button').onclick = close; bg.onclick = function (e) { if (e.target === bg) close(); };
+        document.body.appendChild(bg);
+        return { el: bg, close: close };
+      },
+      confirm: function () { return Promise.resolve(true); },
+      money: function (n) { return 'S/ ' + Number(n).toFixed(2); },
+      fmtTime: function (d) { var h = d.getHours(); return ((h % 12) || 12) + ':' + pad(d.getMinutes()) + (h < 12 ? ' a. m.' : ' p. m.'); },
+      fmtDate: function (d) { return DIAS[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES[d.getMonth()]; },
+      rel: function (d) { var m = Math.floor((now() - d) / 60000); return m < 1 ? 'ahora' : m < 60 ? 'hace ' + m + ' min' : d.toDateString() === now().toDateString() ? 'hace ' + Math.floor(m / 60) + ' h' : 'ayer'; },
+      now: now,
+      icon: function (n, s) { s = s || 20; return '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (IC[n] || '<circle cx="12" cy="12" r="8"/>') + '</svg>'; },
+      productImg: productImg,
+      tile: function (p, size) {
+        var img = productImg(p), box = 'width:' + size + 'px;height:' + size + 'px;';
+        return img.src ? '<img src="' + img.src + '" alt="" style="' + box + 'object-fit:' + (img.kind === 'thumb' ? 'cover' : 'contain') + ';border-radius:8px;background:' + p.fondo + '">'
+          : '<span class="tile" style="' + box + 'background:' + p.color + '"><img src="assets/img/isotipo-blanco.webp" alt=""></span>';
+      },
+      ordersFor: ordersFor,
+      addOrder: function (o) {
+        state.orders.push(o); TB.app.save(); TB.app.emit('order:new', o);
+        TB.app.toast('Nuevo pedido ' + o.code + ' · ' + TB.app.money(o.total), { action: { label: 'Ver', fn: function () { TB.app.go('pedidos', { tab: 'pedidos', code: o.code }); } } });
+      },
+      updateOrder: function (code, patch) { state.patches[code] = Object.assign(state.patches[code] || {}, patch); TB.app.save(); TB.app.emit('order:update', Object.assign({ code: code }, patch)); },
+      nextOrderCode: function () {
+        var max = ordersFor(now()).concat(state.orders).reduce(function (m, o) { return Math.max(m, +o.code.slice(3)); }, 1040);
+        return 'TB-' + (max + 1);
+      }
+    };
+  })();
+</script>
+<script src="js/bot.js"></script>
+<script>
+  /* Bot simulado (solo si js/bot.js no está o se pide ?stubbot): recorre el flujo del guion de la demo. */
+  if (!window.TB.bot || new URLSearchParams(location.search).has('stubbot')) TB.bot = (function () {
+    var D = TB.data;
+    var norm = function (s) { return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); };
+    function items(text) {
+      var t = norm(text), out = [];
+      D.productos.forEach(function (p) {
+        p.alias.some(function (a) {
+          var i = t.indexOf(a); if (i < 0) return false;
+          var m = t.slice(Math.max(0, i - 30), i).match(/(\d+)\D*$/);
+          out.push({ key: p.key, name: p.largo, qty: m ? +m[1] : 1, price: p.precio }); return true;
+        });
+      });
+      return out;
+    }
+    function order(c, now) {
+      var sub = c.items.reduce(function (s, i) { return s + i.qty * i.price; }, 0), z = c.zone;
+      return { customer: { name: c.name }, items: c.items, subtotal: sub, mode: z ? 'delivery' : 'recojo', zone: z ? z.nombre : null, deliveryCost: z ? z.costo : 0, total: sub + (z ? z.costo : 0),
+        slot: { date: now.toISOString().slice(0, 10), time: '15:00', label: z ? 'Hoy en el delivery de las 3:00 p. m.' : 'Hoy, para recoger desde las 4:00 p. m.' },
+        pay: c.pay, channel: 'Bot de WhatsApp', status: 'nuevo', createdAt: now.toISOString() };
+    }
+    return {
+      createConversation: function () { return { step: 'inicio', items: [], zone: null, name: null, pay: null }; },
+      suggestions: function (c) {
+        return { inicio: ['Hola', '¿Qué sabores de marcianos tienen?', 'Quiero 2 empanadas de pollo y 8 marcianos de aguaje', 'Quiero una caja china para el domingo'],
+          modo: ['Delivery a Morales', 'Paso a recoger'], nombre: ['Rosa Panduro'], pago: ['Yape', 'Plin', 'Tarjeta'], confirmar: ['Sí, confirmo', 'Cambiar algo'],
+          hecho: ['¿A qué hora llega?', 'Quiero una caja china para el domingo'] }[c.step] || [];
+      },
+      reply: function (c, text, now) {
+        var t = norm(text), its = items(text);
+        if (/caja china|chanch/.test(t)) return { messages: [
+          { from: 'bot', text: 'Nuestro *chanchito a la caja china* sale los domingos 🐷', product: 'caja-china', delay: 1300 },
+          { from: 'bot', text: 'Para coordinar tu caja china te paso con Alberto 🙌', delay: 900 },
+          { from: 'alberto', text: '¡Hola! Soy Alberto 👋 ¿Para cuántas personas sería el domingo?', delay: 1800 }], order: null, handoff: { reason: 'Caja china' } };
+        if (c.step === 'inicio' && its.length) {
+          c.items = its; c.step = 'modo';
+          return { messages: [{ from: 'bot', text: '¡Buena elección! 🙌', product: its[its.length - 1].key, delay: 1200 },
+            { from: 'bot', text: 'Te anoto ' + its.map(function (i) { return i.qty + ' × ' + i.name.toLowerCase(); }).join(' y ') + '.\n¿Lo quieres con *delivery* o pasas a *recoger*?', delay: 1400 }], order: null, handoff: null };
+        }
+        if (c.step === 'modo') {
+          c.zone = D.delivery.zonas.filter(function (z) { return z.alias.some(function (a) { return t.indexOf(a) >= 0; }); })[0] || null; c.step = 'nombre';
+          return { messages: [{ from: 'bot', text: (c.zone ? 'Perfecto: el delivery a ' + c.zone.nombre + ' cuesta S/ ' + c.zone.costo.toFixed(2) + ' y sale a las 3:00 p. m. 🛵\n' : '¡Listo! Te esperamos en nuestro punto de recojo.\n') + '¿A nombre de quién dejo el pedido?', delay: 1300 }], order: null, handoff: null };
+        }
+        if (c.step === 'nombre') { c.name = text.trim(); c.step = 'pago'; return { messages: [{ from: 'bot', text: 'Gracias, ' + c.name.split(' ')[0] + '. ¿Cómo pagas: Yape, Plin o tarjeta?', delay: 1000 }], order: null, handoff: null }; }
+        if (c.step === 'pago') {
+          c.pay = /plin/.test(t) ? 'Plin' : /tarjeta|visa|master/.test(t) ? 'Tarjeta' : 'Yape'; c.step = 'confirmar';
+          return { messages: [{ from: 'bot', text: '¿Confirmo tu pedido?', order: order(c, now), delay: 1500 }], order: null, handoff: null };
+        }
+        if (c.step === 'confirmar' && /^(si|confirm|dale|ok)/.test(t)) {
+          c.step = 'hecho'; var o = order(c, now);
+          return { messages: [{ from: 'bot', text: '¡Listo, ' + c.name.split(' ')[0] + '! Tu pedido quedó registrado ✅', order: o, delay: 1400 },
+            { from: 'bot', text: 'Te escribimos cuando salga el delivery. ¡Gracias por elegir *Time Bite*! 💚', delay: 900 }], order: o, handoff: null };
+        }
+        return { messages: [{ from: 'bot', text: '¡Hola! 👋 Bienvenido a *Time Bite*. Hoy tenemos empanadas caseras y marcianos gourmet. ¿Qué se te antoja?', delay: 1100 }], order: null, handoff: null };
+      }
+    };
+  })();
+</script>
+<script src="js/chat.js"></script>
+<script>
+  (function () {
+    var qs = new URLSearchParams(location.search);
+    var view = TB.views.filter(function (v) { return v.key === 'pedidos'; })[0];
+    view.mount(document.getElementById('view'));
+    view.show({ tab: qs.get('tab') || 'chat' });
+    if (qs.get('day')) document.querySelector('[data-day="' + qs.get('day') + '"]').click();
+    var script = qs.get('play');
+    if (script) {
+      var texts = script === 'demo' ? ['Hola', 'Quiero 2 empanadas de pollo y 8 marcianos de aguaje', 'Delivery a Morales', 'Rosa Panduro', 'Yape', 'Sí, confirmo', 'Quiero una caja china para el domingo'] : script.split('|');
+      var stop = +qs.get('stop') || texts.length, i = 0;
+      (function next() {
+        if (document.querySelector('.ch-sugs.ch-wait')) return setTimeout(next, 200);
+        if (i >= stop) { if (qs.get('after')) document.querySelector('[data-tab="' + qs.get('after') + '"]').click(); return; }
+        var inp = document.querySelector('.ch-input');
+        inp.value = texts[i++];
+        inp.dispatchEvent(new Event('input'));
+        document.querySelector('.ch-compose').requestSubmit();
+        setTimeout(next, 700);
+      })();
+    }
+    if (qs.has('sheet')) setTimeout(function () { var c = document.querySelector('.ch-oc' + (qs.get('sheet') ? '[data-code="' + qs.get('sheet') + '"]' : '')); if (c) c.click(); }, 400);
+    if (qs.has('menu')) setTimeout(function () { document.querySelector('.ch-more').click(); }, 400);
+    // ?check: informa por consola si la página se desborda a lo ancho (debe ser ancho = ancho visible).
+    if (qs.has('check')) setTimeout(function () { var d = document.documentElement; console.log('ANCHO', d.scrollWidth, d.clientWidth, d.scrollWidth > d.clientWidth ? 'DESBORDA' : 'ok'); }, +qs.get('check') || 3000);
+  })();
+</script>
+</body>
+</html>
